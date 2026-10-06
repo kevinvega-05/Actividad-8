@@ -1,0 +1,176 @@
+# =============================================================================
+#  Zonas Virtualizadas de Simulación Físico-Robótica controladas por ESP32
+#  con Plano de Administración de Red
+#
+#  VLAN 1  Zona Gamer Multijugador     10.10.10.0/24  pista + 3 clientes
+#  VLAN 2  Zona Simulación Robótica    10.20.20.0/24  Spot, Pepper, NAO
+#  VLAN 3  Plano de Administración     10.30.30.0/24  monitor Alpine + broker MQTT
+#  Enrutador inter-VLAN (Alpine + iptables): .254 en cada VLAN
+#
+#  Uso:   copy .env.example .env   (y edítalo)
+#         docker compose up -d --build
+# =============================================================================
+name: zonas-esp32
+
+x-sim: &sim
+  restart: unless-stopped
+  cap_add: [NET_ADMIN]          # para instalar las rutas hacia el enrutador inter-VLAN
+  depends_on: [router]
+
+x-build-cliente: &build-cliente
+  context: .
+  dockerfile: vlan1_gamer/cliente/Dockerfile
+
+x-build-robot: &build-robot
+  context: .
+  dockerfile: vlan2_robotica/Dockerfile
+  args:
+    QIBULLET_ACEPTO_LICENCIA: ${QIBULLET_ACEPTO_LICENCIA:-no}
+
+# Docker Engine 28+ (Docker Desktop reciente) agrega por defecto reglas "raw" que
+# descartan todo paquete hacia un contenedor que no entre por su propio bridge.
+# Eso bloquearía el tráfico que reenvía NUESTRO enrutador inter-VLAN, así que se
+# desactiva esa protección en estas 3 redes: el control de acceso entre VLAN lo
+# hace el enrutador con iptables. (En versiones anteriores la opción se ignora.)
+x-sin-proteccion: &sin_proteccion
+  com.docker.network.bridge.gateway_mode_ipv4: nat-unprotected
+
+networks:
+  vlan1_gamer:
+    name: vlan1_gamer
+    driver_opts: {<<: *sin_proteccion, com.docker.network.bridge.name: br-vlan1}
+    ipam: {config: [{subnet: 10.10.10.0/24, gateway: 10.10.10.1}]}
+  vlan2_robotica:
+    name: vlan2_robotica
+    driver_opts: {<<: *sin_proteccion, com.docker.network.bridge.name: br-vlan2}
+    ipam: {config: [{subnet: 10.20.20.0/24, gateway: 10.20.20.1}]}
+  vlan3_admin:
+    name: vlan3_admin
+    driver_opts: {<<: *sin_proteccion, com.docker.network.bridge.name: br-vlan3}
+    ipam: {config: [{subnet: 10.30.30.0/24, gateway: 10.30.30.1}]}
+
+services:
+  # ------------------------------------------------------------ VLAN 3 (admin)
+  mqtt:
+    image: eclipse-mosquitto:2
+    container_name: zv-mqtt
+    restart: unless-stopped
+    volumes:
+      - ./vlan3_admin/mqtt/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    ports: ["1883:1883"]                       # la ESP32 esclava de LEDs entra por aquí
+    networks:
+      vlan3_admin: {ipv4_address: 10.30.30.20}
+
+  router:
+    build: {context: ., dockerfile: vlan3_admin/router/Dockerfile}
+    image: ${DOCKERHUB_USUARIO:-tuusuario}/zv-router:${TAG:-1.0}
+    container_name: zv-router
+    restart: unless-stopped
+    cap_add: [NET_ADMIN]
+    sysctls: {net.ipv4.ip_forward: 1}
+    depends_on: [mqtt]
+    networks:
+      vlan1_gamer: {ipv4_address: 10.10.10.254}
+      vlan2_robotica: {ipv4_address: 10.20.20.254}
+      vlan3_admin: {ipv4_address: 10.30.30.254}
+
+  guardia:
+    # 2.ª capa: impide que el motor Docker encamine entre los bridges de las VLAN
+    build: {context: ., dockerfile: vlan3_admin/guardia/Dockerfile}
+    image: ${DOCKERHUB_USUARIO:-tuusuario}/zv-guardia:${TAG:-1.0}
+    container_name: zv-guardia
+    restart: unless-stopped
+    network_mode: host
+    cap_add: [NET_ADMIN, NET_RAW]
+
+  monitor:
+    <<: *sim
+    build: {context: ., dockerfile: vlan3_admin/monitor/Dockerfile}
+    image: ${DOCKERHUB_USUARIO:-tuusuario}/zv-monitor:${TAG:-1.0}
+    container_name: zv-monitor
+    environment:
+      TZ: ${TZ:-America/Bogota}
+      ROUTER_IP: 10.30.30.254
+      UMBRAL_LATENCIA_MS: ${UMBRAL_LATENCIA_MS:-50}
+      UMBRAL_JITTER_MS: ${UMBRAL_JITTER_MS:-20}
+      UMBRAL_PERDIDA_PCT: ${UMBRAL_PERDIDA_PCT:-5}
+    volumes: ["./datos:/datos"]                # metricas.csv queda en tu carpeta
+    ports: ["8000:8000"]
+    depends_on: [router, mqtt]
+    networks:
+      vlan3_admin: {ipv4_address: 10.30.30.10}
+
+  # ------------------------------------------------------------ VLAN 1 (gamer)
+  pista:
+    <<: *sim
+    build: {context: ., dockerfile: vlan1_gamer/pista/Dockerfile}
+    image: ${DOCKERHUB_USUARIO:-tuusuario}/zv-pista:${TAG:-1.0}
+    container_name: zv-pista
+    environment: {TZ: "${TZ:-America/Bogota}", ROUTER_IP: 10.10.10.254, MQTT_BROKER: 10.30.30.20, PRUEBA_AISLAMIENTO: "10.20.20.21:8080"}
+    ports: ["8080:8080"]
+    networks:
+      vlan1_gamer: {ipv4_address: 10.10.10.10}
+
+  cliente1:
+    <<: *sim
+    build: *build-cliente
+    image: ${DOCKERHUB_USUARIO:-tuusuario}/zv-cliente:${TAG:-1.0}
+    container_name: zv-cliente1
+    environment: {TZ: "${TZ:-America/Bogota}", CLIENTE_ID: 1, ROUTER_IP: 10.10.10.254, MQTT_BROKER: 10.30.30.20}
+    ports: ["8081:8080", "5001:5001/udp"]
+    depends_on: [router, pista]
+    networks:
+      vlan1_gamer: {ipv4_address: 10.10.10.11}
+
+  cliente2:
+    <<: *sim
+    build: *build-cliente
+    image: ${DOCKERHUB_USUARIO:-tuusuario}/zv-cliente:${TAG:-1.0}
+    container_name: zv-cliente2
+    environment: {TZ: "${TZ:-America/Bogota}", CLIENTE_ID: 2, ROUTER_IP: 10.10.10.254, MQTT_BROKER: 10.30.30.20}
+    ports: ["8082:8080", "5002:5002/udp"]
+    depends_on: [router, pista]
+    networks:
+      vlan1_gamer: {ipv4_address: 10.10.10.12}
+
+  cliente3:
+    <<: *sim
+    build: *build-cliente
+    image: ${DOCKERHUB_USUARIO:-tuusuario}/zv-cliente:${TAG:-1.0}
+    container_name: zv-cliente3
+    environment: {TZ: "${TZ:-America/Bogota}", CLIENTE_ID: 3, ROUTER_IP: 10.10.10.254, MQTT_BROKER: 10.30.30.20}
+    ports: ["8083:8080", "5003:5003/udp"]
+    depends_on: [router, pista]
+    networks:
+      vlan1_gamer: {ipv4_address: 10.10.10.13}
+
+  # ------------------------------------------------------------ VLAN 2 (robótica)
+  spot:
+    <<: *sim
+    build: *build-robot
+    image: ${DOCKERHUB_USUARIO:-tuusuario}/zv-robot:${TAG:-1.0}
+    container_name: zv-spot
+    environment: {TZ: "${TZ:-America/Bogota}", ROBOT: spot, ROUTER_IP: 10.20.20.254, MQTT_BROKER: 10.30.30.20, PRUEBA_AISLAMIENTO: "10.10.10.10:8080"}
+    ports: ["8091:8080", "5011:5011/udp"]
+    networks:
+      vlan2_robotica: {ipv4_address: 10.20.20.21}
+
+  pepper:
+    <<: *sim
+    build: *build-robot
+    image: ${DOCKERHUB_USUARIO:-tuusuario}/zv-robot:${TAG:-1.0}
+    container_name: zv-pepper
+    environment: {TZ: "${TZ:-America/Bogota}", ROBOT: pepper, ROUTER_IP: 10.20.20.254, MQTT_BROKER: 10.30.30.20, PRUEBA_AISLAMIENTO: "10.10.10.10:8080"}
+    ports: ["8092:8080", "5012:5012/udp"]
+    networks:
+      vlan2_robotica: {ipv4_address: 10.20.20.22}
+
+  nao:
+    <<: *sim
+    build: *build-robot
+    image: ${DOCKERHUB_USUARIO:-tuusuario}/zv-robot:${TAG:-1.0}
+    container_name: zv-nao
+    environment: {TZ: "${TZ:-America/Bogota}", ROBOT: nao, ROUTER_IP: 10.20.20.254, MQTT_BROKER: 10.30.30.20, PRUEBA_AISLAMIENTO: "10.10.10.10:8080"}
+    ports: ["8093:8080", "5013:5013/udp"]
+    networks:
+      vlan2_robotica: {ipv4_address: 10.20.20.23}

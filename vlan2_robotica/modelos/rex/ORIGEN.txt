@@ -1,0 +1,2 @@
+Modelo Rex (cuadrúpedo tipo Spot) tomado de https://github.com/nicrusso7/rex-gym
+(rex_gym/util/pybullet_data/assets/urdf). Licencia Apache 2.0, ver LICENSE.

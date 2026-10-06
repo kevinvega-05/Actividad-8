@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Plano de Administración</title>
+<style>
+:root{
+  color-scheme:light;
+  --bg:#f4f4f2;--surface-1:#fcfcfb;--line:#e4e3df;--text-primary:#0b0b0b;--text-secondary:#52514e;--text-muted:#7a7975;
+  --series-1:#2a78d6;--good:#0ca30c;--warning:#fab219;--critical:#d03b3b;--off:#c9c8c3;
+  --vlan1:#2a78d6;--vlan2:#eb6834;--vlan3:#4a3aa7;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  color-scheme:dark;--bg:#111110;--surface-1:#1a1a19;--line:#2c2c2a;--text-primary:#ffffff;--text-secondary:#c3c2b7;--text-muted:#8f8e86;
+  --series-1:#3987e5;--off:#3a3a37;--vlan1:#3987e5;--vlan2:#d95926;--vlan3:#9085e9;}}
+:root[data-theme="dark"]{
+  color-scheme:dark;--bg:#111110;--surface-1:#1a1a19;--line:#2c2c2a;--text-primary:#ffffff;--text-secondary:#c3c2b7;--text-muted:#8f8e86;
+  --series-1:#3987e5;--off:#3a3a37;--vlan1:#3987e5;--vlan2:#d95926;--vlan3:#9085e9;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text-primary);font:14px/1.45 system-ui,"Segoe UI",Roboto,sans-serif}
+header{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;padding:16px 20px;border-bottom:1px solid var(--line);background:var(--surface-1)}
+h1{font-size:18px;margin:0;font-weight:650}
+.sub{color:var(--text-secondary);font-size:13px}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-left:auto}
+.chip{font-size:12px;padding:4px 10px;border-radius:99px;border:1px solid var(--line);color:var(--text-secondary);display:flex;gap:6px;align-items:center}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--off)}
+main{padding:16px 20px;display:grid;gap:16px}
+section{background:var(--surface-1);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+h2{font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--text-secondary);margin:0 0 12px;font-weight:600}
+/* tira de LEDs */
+.leds{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:10px}
+@media(max-width:760px){.leds{grid-template-columns:repeat(4,minmax(0,1fr))}}
+.led{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:12px;color:var(--text-secondary);text-align:center}
+.led i{width:22px;height:22px;border-radius:50%;background:var(--off);box-shadow:inset 0 -3px 6px rgba(0,0,0,.25)}
+.led i.e1{background:var(--good)}
+.led i.e2{background:var(--good);animation:rap .25s steps(1) infinite}
+.led i.e3{background:var(--warning);animation:len 1s steps(1) infinite}
+@keyframes rap{50%{background:var(--off)}}@keyframes len{50%{background:var(--off)}}
+.leyenda{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:12px;font-size:12px;color:var(--text-muted)}
+/* zonas */
+.zonas{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+@media(max-width:1100px){.zonas{grid-template-columns:1fr}}
+.zona h2{display:flex;align-items:center;gap:8px}
+.zona h2 b{width:10px;height:10px;border-radius:3px;display:inline-block}
+.cards{display:grid;gap:10px}
+.card{border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.card .top{display:flex;align-items:center;gap:8px}
+.card .n{font-weight:600}.card .ip{color:var(--text-muted);font-size:12px;font-variant-numeric:tabular-nums}
+.badge{margin-left:auto;font-size:12px;font-weight:600;display:flex;align-items:center;gap:5px;color:var(--text-primary)}
+.badge svg{width:14px;height:14px}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px 10px;margin-top:8px}
+.kpi{font-size:11px;color:var(--text-muted)}.kpi span{display:block;font-size:14px;color:var(--text-primary);font-variant-numeric:tabular-nums}
+.esp{margin-top:6px;font-size:12px;color:var(--text-secondary)}
+.spark{position:relative;margin-top:8px}
+.spark canvas{width:100%;height:44px;display:block}
+.tip{position:absolute;pointer-events:none;background:var(--text-primary);color:var(--surface-1);font-size:11px;padding:3px 6px;border-radius:5px;white-space:nowrap;transform:translate(-50%,-110%);display:none}
+/* tablas */
+.dos{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+@media(max-width:900px){.dos{grid-template-columns:1fr}}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:left}
+th{color:var(--text-secondary);font-weight:600;font-size:12px}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+.ok{color:var(--good)}.bad{color:var(--critical)}
+button,a.btn{font:inherit;font-size:13px;padding:6px 12px;border-radius:8px;border:1px solid var(--line);background:var(--surface-1);color:var(--text-primary);cursor:pointer;text-decoration:none}
+.acciones{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.ev{font:12px/1.7 ui-monospace,Consolas,monospace;color:var(--text-secondary);max-height:220px;overflow:auto;white-space:pre-wrap}
+.scroll{overflow-x:auto}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>Plano de Administración · VLAN 3</h1>
+    <div class="sub">Monitor Alpine 10.30.30.10 · observa ambas zonas a través del enrutador inter-VLAN</div>
+  </div>
+  <div class="chips">
+    <span class="chip" id="c-mqtt"><span class="dot"></span>Broker MQTT</span>
+    <span class="chip" id="c-router"><span class="dot"></span>Enrutador</span>
+    <span class="chip" id="c-esclava"><span class="dot"></span>ESP32 esclava</span>
+    <span class="chip" id="c-up">—</span>
+  </div>
+</header>
+<main>
+  <section>
+    <h2>LEDs de la ESP32 esclava (réplica en vivo)</h2>
+    <div class="leds" id="leds"></div>
+    <div class="leyenda">
+      <span>● fijo = OK</span><span>● parpadeo rápido = activo (su ESP32 lo controla)</span>
+      <span>● parpadeo lento = degradado</span><span>○ apagado = caído</span><span id="umbrales"></span>
+    </div>
+  </section>
+  <div class="zonas">
+    <section class="zona"><h2><b style="background:var(--vlan1)"></b>VLAN 1 · Zona Gamer Multijugador</h2><div class="cards" id="z-vlan1"></div></section>
+    <section class="zona"><h2><b style="background:var(--vlan2)"></b>VLAN 2 · Zona de Simulación Robótica</h2><div class="cards" id="z-vlan2"></div></section>
+    <section class="zona"><h2><b style="background:var(--vlan3)"></b>VLAN 3 · Administración</h2><div class="cards" id="z-vlan3"></div></section>
+  </div>
+  <div class="dos">
+    <section><h2>Pruebas de aislamiento</h2><table id="iso"></table></section>
+    <section><h2>Enrutador inter-VLAN · contadores de iptables</h2><table id="reglas"></table></section>
+  </div>
+  <section>
+    <h2>Validación experimental (desde que arrancó el monitor)</h2>
+    <div class="acciones">
+      <button id="b-rep">Actualizar reporte</button>
+      <a class="btn" href="/metricas.csv">Descargar metricas.csv</a>
+    </div>
+    <div class="scroll"><table id="rep"><tr><td>Presiona “Actualizar reporte”.</td></tr></table></div>
+  </section>
+  <section><h2>Eventos</h2><div class="ev" id="ev"></div></section>
+</main>
+<div class="tip" id="tip"></div>
+<script>
+const ICONO={
+  OK:'<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="7" fill="var(--good)"/><path d="M4.5 8.2l2.2 2.2 4.8-4.8" stroke="#fff" stroke-width="2" fill="none"/></svg>',
+  ACTIVO:'<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="7" fill="var(--good)"/><path d="M3.5 8h2l1.5-3 2 6 1.5-3h2" stroke="#fff" stroke-width="1.6" fill="none"/></svg>',
+  DEGRADADO:'<svg viewBox="0 0 16 16"><path d="M8 1.5l7 13H1z" fill="var(--warning)"/><path d="M8 6v4M8 11.6v.9" stroke="#111" stroke-width="1.8"/></svg>',
+  'CAÍDO':'<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="7" fill="var(--critical)"/><path d="M5 5l6 6M11 5l-6 6" stroke="#fff" stroke-width="2"/></svg>'};
+const ETIQ={pista:'Servidor de pista',cliente1:'Cliente 1',cliente2:'Cliente 2',cliente3:'Cliente 3',spot:'Spot',pepper:'Pepper',nao:'NAO',router:'Enrutador',mqtt:'Broker MQTT'};
+const f=(v,u='',d=1)=>v==null?'—':(+v).toFixed(d)+u;
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+let series={};
+
+function chip(id,ok,txt){const c=document.getElementById(id);c.querySelector('.dot').style.background=ok?'var(--good)':'var(--critical)';
+  c.lastChild.textContent=txt;}
+
+function sparkline(cv,datos){
+  const r=window.devicePixelRatio||1,w=cv.clientWidth,h=cv.clientHeight;cv.width=w*r;cv.height=h*r;
+  const x=cv.getContext('2d');x.scale(r,r);x.clearRect(0,0,w,h);
+  const v=datos.filter(d=>d!=null);if(!v.length)return;
+  const max=Math.max(1,...v)*1.15,n=datos.length;
+  x.strokeStyle=css('--line');x.lineWidth=1;x.beginPath();x.moveTo(0,h-.5);x.lineTo(w,h-.5);x.stroke();
+  x.strokeStyle=css('--series-1');x.lineWidth=2;x.lineJoin='round';x.beginPath();let pen=false;
+  datos.forEach((d,i)=>{const px=n<2?w:i*(w-2)/(n-1)+1;if(d==null){pen=false;return}const py=h-2-(d/max)*(h-6);
+    pen?x.lineTo(px,py):x.moveTo(px,py);pen=true});x.stroke();
+  // huecos (sondeos perdidos) marcados en rojo sobre la base
+  x.fillStyle=css('--critical');datos.forEach((d,i)=>{if(d==null){const px=n<2?w:i*(w-2)/(n-1)+1;x.fillRect(px-1,h-4,2,4)}});
+  cv._max=max;cv._n=n;cv._datos=datos;
+}
+
+function tarjeta(o){
+  const m=o.metricas,e=o.esp32;
+  const esp=e?`<div class="esp">ESP32 maestra: ${e.conectada?`<b>conectada</b> · RTT ${f(e.rtt_ms,' ms',2)} · jitter ${f(e.jitter_ms,' ms',2)} · pérdida ${f(e.perdida_pct,' %',1)} · ${e.pps} paq/s`:'desconectada'}</div>`:'';
+  return `<div class="card" id="card-${o.nombre}">
+    <div class="top"><span class="n">${ETIQ[o.nombre]||o.nombre}</span><span class="ip">${o.ip}</span>
+      <span class="badge">${ICONO[o.estado]}${o.estado}</span></div>
+    <div class="kpis">
+      <div class="kpi">Latencia<span>${f(m.lat_ms,' ms',2)}</span></div>
+      <div class="kpi">p95<span>${f(m.lat_p95_ms,' ms',2)}</span></div>
+      <div class="kpi">Jitter<span>${f(m.jitter_ms,' ms',2)}</span></div>
+      <div class="kpi">Disponib.<span>${f(m.disp_total_pct,' %',2)}</span></div>
+    </div>${esp}
+    <div class="spark"><canvas aria-label="Latencia ICMP de ${o.nombre}, últimos 3 minutos"></canvas></div></div>`;
+}
+
+async function tick(){
+  try{
+    const s=await (await fetch('/api/estado')).json();
+    chip('c-mqtt',s.mqtt,s.mqtt?'Broker MQTT':'Broker MQTT sin conexión');
+    chip('c-router',!!s.router.vivo,s.router.vivo?'Enrutador publicando':'Enrutador sin datos');
+    chip('c-esclava',!!s.esclava.vivo,s.esclava.vivo?`ESP32 esclava · RSSI ${s.esclava.rssi??'—'} dBm`:'ESP32 esclava desconectada');
+    document.getElementById('c-up').textContent=`Monitor activo ${Math.floor(s.uptime_s/60)} min ${s.uptime_s%60} s`;
+    document.getElementById('umbrales').textContent=`Umbrales: latencia p95 > ${s.umbrales.latencia_ms} ms, jitter > ${s.umbrales.jitter_ms} ms o pérdida > ${s.umbrales.perdida_pct} %`;
+    const leds=s.objetivos.filter(o=>o.nombre!=='mqtt');
+    document.getElementById('leds').innerHTML=leds.map((o,i)=>`<div class="led"><i class="e${s.leds[i]}" title="${o.estado}"></i>LED ${i+1}<br>${ETIQ[o.nombre]}</div>`).join('');
+    for(const z of ['vlan1','vlan2','vlan3']){
+      document.getElementById('z-'+z).innerHTML=s.objetivos.filter(o=>o.zona===z).map(tarjeta).join('');
+    }
+    s.objetivos.forEach(o=>{const cv=document.querySelector(`#card-${o.nombre} canvas`);if(cv){series[o.nombre]=o.serie;sparkline(cv,o.serie);cv.dataset.n=o.nombre}});
+    document.getElementById('iso').innerHTML='<tr><th>Prueba</th><th>Esperado</th><th>Resultado</th><th></th></tr>'+
+      s.aislamiento.map(a=>`<tr><td>${a.prueba}</td><td>${a.esperado}</td><td>${a.resultado??'verificando…'}</td><td class="${a.ok?'ok':'bad'}">${a.ok?'✓ cumple':'✗ revisar'}</td></tr>`).join('');
+    const reglas=Object.entries((s.router.reglas)||{});
+    document.getElementById('reglas').innerHTML='<tr><th>Regla</th><th>Acción</th><th class="num">Paquetes</th><th class="num">Bytes</th></tr>'+
+      (reglas.length?reglas.map(([k,v])=>`<tr><td>${k.replaceAll('_',' ')}</td><td class="${k.startsWith('BLOQ')?'bad':'ok'}">${k.startsWith('BLOQ')?'bloquear':'permitir'}</td><td class="num">${v.paquetes.toLocaleString('es')}</td><td class="num">${v.bytes.toLocaleString('es')}</td></tr>`).join('')
+      :'<tr><td colspan="4">Esperando datos del enrutador…</td></tr>');
+    document.getElementById('ev').textContent=s.eventos.join('\n')||'—';
+  }catch(err){}
+  setTimeout(tick,1000);
+}
+tick();
+
+// tooltip de las sparklines (crosshair por posición)
+const tip=document.getElementById('tip');
+document.addEventListener('mousemove',ev=>{
+  const cv=ev.target.closest&&ev.target.closest('.spark canvas');
+  if(!cv||!cv._datos){tip.style.display='none';return}
+  const r=cv.getBoundingClientRect(),i=Math.round((ev.clientX-r.left)/r.width*(cv._n-1));
+  const d=cv._datos[Math.max(0,Math.min(cv._n-1,i))],hace=cv._n-1-i;
+  tip.textContent=(d==null?'sin respuesta':d.toFixed(2)+' ms')+` · hace ${hace} s`;
+  tip.style.left=ev.clientX+'px';tip.style.top=(r.top+window.scrollY)+'px';tip.style.display='block';
+});
+
+document.getElementById('b-rep').onclick=async()=>{
+  const r=await (await fetch('/api/reporte')).json();
+  const cols=[['contenedor','Contenedor'],['muestras','Muestras'],['lat_media_ms','Latencia media (ms)'],['lat_p95_ms','p95 (ms)'],['lat_max_ms','Máx (ms)'],
+    ['jitter_ms','Jitter (ms)'],['perdida_pct','Pérdida (%)'],['disponibilidad_pct','Disponibilidad (%)'],['esp32_rtt_medio_ms','RTT ESP32 medio (ms)'],['esp32_rtt_p95_ms','RTT ESP32 p95 (ms)'],['esp32_jitter_medio_ms','Jitter ESP32 (ms)']];
+  document.getElementById('rep').innerHTML=`<tr>${cols.map(c=>`<th>${c[1]}</th>`).join('')}</tr>`+
+    r.filas.map(f_=>`<tr>${cols.map(([k],i)=>`<td class="${i?'num':''}">${i===0?(ETIQ[f_[k]]||f_[k]):(f_[k]??'—')}</td>`).join('')}</tr>`).join('')+
+    `<tr><td colspan="${cols.length}" style="color:var(--text-muted)">Duración de la medición: ${Math.round(r.duracion_s/60)} min · sondeo ICMP + HTTP cada 1 s por contenedor</td></tr>`;
+};
+</script>
+</body>
+</html>

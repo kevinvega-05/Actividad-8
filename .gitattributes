@@ -1,2 +1,13 @@
-# Auto detect text files and perform LF normalization
-* text=auto
+# Los scripts que corren DENTRO de los contenedores (Linux) deben quedar con LF
+# aunque se clone el repositorio en Windows.
+*.sh   text eol=lf
+*.py   text eol=lf
+*.conf text eol=lf
+Dockerfile text eol=lf
+*.yml  text eol=lf
+# Scripts de PowerShell para Windows
+*.ps1  text eol=crlf
+# Binarios
+*.stl  binary
+*.png  binary
+*.jpg  binary
